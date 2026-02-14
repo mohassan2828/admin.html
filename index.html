@@ -2,80 +2,74 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم محمد | مراقب الزوار</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Cairo', sans-serif; background: #0f172a; color: white; padding: 20px; margin: 0; }
-        .header { text-align: center; padding: 30px; background: #1e293b; border-bottom: 4px solid #38bdf8; border-radius: 0 0 20px 20px; margin-bottom: 25px; }
-        .stat-card { background: #1e293b; padding: 25px; border-radius: 20px; text-align: center; border: 1px solid #334155; margin-bottom: 20px; }
-        .stat-card h2 { color: #38bdf8; font-size: 55px; margin: 5px 0; }
-        .log-table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 15px; overflow: hidden; }
-        th, td { padding: 12px; text-align: right; border-bottom: 1px solid #334155; font-size: 14px; }
-        th { background: #334155; color: #38bdf8; }
-        .status { display: inline-block; padding: 5px 10px; border-radius: 8px; font-size: 12px; background: #16a34a; }
-    </style>
+    <title>لوحة تحكم CV محمد</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
+<body class="bg-gray-900 text-white p-5">
+    <h1 class="text-3xl font-bold text-center mb-10 text-blue-400">إحصائيات موقع الـ CV</h1>
 
-<div class="header">
-    <h1><i class="fas fa-chart-line"></i> إحصائيات CV FORGE</h1>
-    <p>أهلاً يا محمد، هنا تراقب زوارك في الوقت الفعلي</p>
-</div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div class="bg-gray-800 p-6 rounded-lg text-center shadow-lg border-b-4 border-blue-500">
+            <h2 class="text-xl">إجمالي الزوار</h2>
+            <p id="total-visitors" class="text-5xl font-bold mt-2">0</p>
+        </div>
+        <div class="bg-gray-800 p-6 rounded-lg text-center shadow-lg border-b-4 border-green-500">
+            <h2 class="text-xl">إجمالي التحميلات</h2>
+            <p id="total-downloads" class="text-5xl font-bold mt-2">0</p>
+        </div>
+    </div>
 
-<div class="stat-card">
-    <h3>إجمالي الزوار</h3>
-    <h2 id="total-v">0</h2>
-    <span class="status">متصل الآن</span>
-</div>
+    <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h2 class="text-xl mb-4 text-blue-300">آخر الزوار</h2>
+        <table class="w-full text-right">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="p-2">التوقيت</th>
+                    <th class="p-2">الدولة</th>
+                    <th class="p-2">المدينة</th>
+                </tr>
+            </thead>
+            <tbody id="visitors-table"></tbody>
+        </table>
+    </div>
 
-<div style="overflow-x:auto;">
-    <table class="log-table">
-        <thead>
-            <tr>
-                <th>التوقيت</th>
-                <th>المصدر</th>
-                <th>النظام</th>
-            </tr>
-        </thead>
-        <tbody id="logs-list">
-            </tbody>
-    </table>
-</div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // نفس بياناتك اللي كانت في الصور
+        const firebaseConfig = {
+            apiKey: "AIzaSyBeTU1K8LyYh5ZRa9omgewSO9PP4JxFvf4",
+            authDomain: "cv-stats-d2eda.firebaseapp.com",
+            projectId: "cv-stats-d2eda",
+            storageBucket: "cv-stats-d2eda.appspot.com",
+            messagingSenderId: "751477887016",
+            appId: "1:751477887016:web:315202dbae3a945f02a51d"
+        };
 
-    // المفتاح الخاص بك (نفس الموجود في موقع الـ CV)
-    const firebaseConfig = {
-        apiKey: "AIzaSyBeTU1K8LyYh5ZRa9omgewSO9PP4JxFVf4",
-        authDomain: "cv-stats-d2eda.firebaseapp.com",
-        projectId: "cv-stats-d2eda",
-        storageBucket: "cv-stats-d2eda.firebasestorage.app",
-        messagingSenderId: "751477887016",
-        appId: "1:751477887016:web:315202dbae3a945f02a51d"
-    };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // سحب البيانات لحظياً
-    const q = query(collection(db, "visitor_logs"), orderBy("timestamp", "desc"));
-    onSnapshot(q, (snapshot) => {
-        document.getElementById('total-v').innerText = snapshot.size;
-        let html = "";
-        snapshot.forEach((doc) => {
-            const d = doc.data();
-            const time = d.timestamp ? d.timestamp.toDate().toLocaleString('ar-EG') : "...";
-            html += `<tr>
-                <td>${time}</td>
-                <td>${d.visitorSource}</td>
-                <td>${d.platform}</td>
-            </tr>`;
+        // مراقبة الزوار (visitor_lo)
+        onSnapshot(collection(db, "visitor_lo"), (snapshot) => {
+            document.getElementById('total-visitors').innerText = snapshot.size;
+            const table = document.getElementById('visitors-table');
+            table.innerHTML = "";
+            snapshot.docs.slice(0, 5).forEach(doc => {
+                const d = doc.data();
+                table.innerHTML += `<tr class="border-b border-gray-700 text-sm">
+                    <td class="p-2">${d.timestamp?.toDate().toLocaleString('ar-EG') || 'حالية'}</td>
+                    <td class="p-2">${d.country || 'غير معروف'}</td>
+                    <td class="p-2">${d.city || 'غير معروف'}</td>
+                </tr>`;
+            });
         });
-        document.getElementById('logs-list').innerHTML = html;
-    });
-</script>
+
+        // مراقبة التحميلات (download_logs)
+        onSnapshot(collection(db, "download_logs"), (snapshot) => {
+            document.getElementById('total-downloads').innerText = snapshot.size;
+        });
+    </script>
 </body>
 </html>
